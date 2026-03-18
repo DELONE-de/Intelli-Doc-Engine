@@ -17,7 +17,7 @@ export class BaseInfraStack extends cdk.Stack {
 
     // ── S3 Document Bucket ──────────────────────────────────────────────────
     this.docBucket = new s3.Bucket(this, 'DocBucket', {
-      bucketName: `intelli-doc-uploads-${this.account}`,
+      bucketName: `intelli-doc-uploads${this.account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: true,
