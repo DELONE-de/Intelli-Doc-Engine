@@ -2,7 +2,6 @@ import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
 
@@ -37,12 +36,6 @@ export class IngestionLambda extends Construct {
         SQS_QUEUE_URL:  extractionQueue.queueUrl,
       },
     });
-
-    // S3 trigger — fires on all object uploads
-    docBucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED,
-      new s3n.LambdaDestination(this.fn)
-    );
 
     new cdk.CfnOutput(scope, 'IngestionFunctionArn', { value: this.fn.functionArn });
   }

@@ -22,6 +22,7 @@ export class BaseInfraStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: true,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      eventBridgeEnabled: true,
       cors: [
         {
           allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.POST, s3.HttpMethods.GET],
