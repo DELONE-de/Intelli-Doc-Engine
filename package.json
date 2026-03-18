@@ -2,12 +2,19 @@
   "name": "intelli-doc-engine",
   "version": "0.1.0",
   "dependencies": {
-    "dotenv": "^16.0.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1011.0",
+    "@aws-sdk/client-sqs": "^3.1011.0",
+    "@aws-sdk/client-textract": "^3.1011.0",
+    "@opensearch-project/opensearch": "^3.5.1",
     "@types/node": "^25.5.0",
     "aws-cdk": "^2.1111.0",
     "aws-cdk-lib": "^2.243.0",
     "constructs": "^10.5.1",
+    "dotenv": "^16.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.161"
   }
 }
