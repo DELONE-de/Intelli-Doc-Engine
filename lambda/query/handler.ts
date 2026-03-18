@@ -1,53 +1,63 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { embedQuery }                    from './embedder';
+import { retrieveChunks, RetrievedChunk } from './retriever';
+import { generateAnswer }                from './generator';
 
-const bedrock = new BedrockRuntimeClient({ region: process.env.AWS_REGION });
+interface QueryRequest {
+  question: string;
+}
 
-export const handler = async (event: any) => {
+interface QueryResponse {
+  answer:  string;
+  sources: RetrievedChunk['metadata'][];
+}
+
+function respond(statusCode: number, body: object): APIGatewayProxyResult {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify(body),
+  };
+}
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body ?? {};
-    const queryParams = event.queryParams ?? {};
-    const pathParams = event.pathParams ?? {};
-    const headers = event.headers ?? {};
+    // ── 1. Parse & validate ───────────────────────────────────────────────
+    const body: Partial<QueryRequest> = event.body
+      ? JSON.parse(event.body)
+      : {};
 
-    const prompt = body.prompt ?? body.query ?? queryParams.prompt ?? '';
-
-    if (!prompt) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing required field: prompt or query' }),
-      };
+    if (!body.question?.trim()) {
+      return respond(400, { error: 'Missing required field: question' });
     }
 
-    const payload = {
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
-    };
+    const { question } = body as QueryRequest;
+    console.log(`[handler] Question: "${question}"`);
 
-    const command = new InvokeModelCommand({
-      modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: JSON.stringify(payload),
-    });
+    // ── 2. Embed query ────────────────────────────────────────────────────
+    const { embedding } = await embedQuery(question);
 
-    const response = await bedrock.send(command);
-    const result = JSON.parse(Buffer.from(response.body).toString('utf-8'));
+    // ── 3. Retrieve relevant chunks ───────────────────────────────────────
+    const chunks = await retrieveChunks(embedding, question);
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        generated: result.content?.[0]?.text ?? '',
-        model: result.model,
-        usage: result.usage,
-        receivedParams: { body, queryParams, pathParams },
-      }),
-    };
+    if (chunks.length === 0) {
+      return respond(200, {
+        answer:  "I don't have enough information to answer that question.",
+        sources: [],
+      } satisfies QueryResponse);
+    }
+
+    // ── 4. Generate answer ────────────────────────────────────────────────
+    const { answer, inputTokens, outputTokens } = await generateAnswer({ question, chunks });
+    console.log(`[handler] Answer generated (${answer.length} chars, tokens: ${inputTokens}in/${outputTokens}out)`);
+
+    return respond(200, {
+      answer,
+      sources: chunks.map(c => c.metadata),
+    } satisfies QueryResponse);
+
   } catch (err: any) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
-    };
+    console.error('[handler] Error:', err.message, err.stack);
+    return respond(500, { error: 'Internal server error' });
   }
 };

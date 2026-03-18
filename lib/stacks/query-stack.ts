@@ -1,4 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
 import { BaseInfraStack } from './base-infra-stack';
 import { QueryLambda } from '../constructs/query-lambda';
@@ -9,6 +10,8 @@ interface QueryStackProps extends cdk.StackProps {
 }
 
 export class QueryStack extends cdk.Stack {
+  public readonly queryFn: lambda.Function;
+
   constructor(scope: Construct, id: string, props: QueryStackProps) {
     super(scope, id, props);
 
@@ -18,6 +21,8 @@ export class QueryStack extends cdk.Stack {
       queryRole,
       collectionEndpoint,
     });
+
+    this.queryFn = fn;
 
     new ApiGateway(this, 'ApiGateway', { queryFn: fn });
   }

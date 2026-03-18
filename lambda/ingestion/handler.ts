@@ -1,7 +1,7 @@
 import { SQSEvent, SQSBatchResponse, SQSBatchItemFailure } from 'aws-lambda';
 import { processRecord } from './chunker';
 import { embedChunks }   from './embedder';
-import { indexChunks }   from './indexer';
+import { indexChunks, deleteDocumentChunks } from './indexer';
 
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   const failures: SQSBatchItemFailure[] = [];
@@ -20,11 +20,16 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
 
         console.log(`[handler] ${messageId} — ${chunks.length} chunks produced`);
 
-        // ── 2. Embed ──────────────────────────────────────────────────────
+        // ── 2. Delete existing chunks (handles re-uploads / updates) ──────
+        const documentId = chunks[0].documentId;
+        await deleteDocumentChunks(documentId);
+        console.log(`[handler] ${messageId} — old chunks cleared for: ${documentId}`);
+
+        // ── 3. Embed ──────────────────────────────────────────────────────
         const embedded = await embedChunks(chunks);
         console.log(`[handler] ${messageId} — ${embedded.length} embeddings generated`);
 
-        // ── 3. Index ──────────────────────────────────────────────────────
+        // ── 4. Index ──────────────────────────────────────────────────────
         await indexChunks(embedded);
         console.log(`[handler] ${messageId} — indexed successfully`);
 
@@ -39,6 +44,5 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     console.warn(`[handler] ${failures.length}/${event.Records.length} messages failed — returning for retry`);
   }
 
-  // Returning batchItemFailures lets SQS retry only failed messages
   return { batchItemFailures: failures };
 };
